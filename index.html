@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบัญชีรายรับ-รายจ่ายอัจฉริยะ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Prompt for clean Thai typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js for Dashboard Visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#10B981',
+                        danger: '#EF4444',
+                        dark: '#0F172A'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #F8FAFC; }
+        .pin-dot { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .pin-dot.active { background-color: #4F46E5; transform: scale(1.2); border-color: #4F46E5; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+        .shake { animation: shake 0.3s ease-in-out; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-indigo-100 selection:text-indigo-700">
+
+    <!-- ========================================== -->
+    <!-- 1. LOCK SCREEN (6-DIGIT PIN: 456789)       -->
+    <!-- ========================================== -->
+    <div id="lock-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-4">
+        <div class="w-full max-w-sm bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl text-center">
+            <div class="w-16 h-16 bg-indigo-500/20 text-indigo-300 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-400/30">
+                <i class="fa-solid fa-shield-halved text-2xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold mb-1">เข้าสู่ระบบบัญชี</h1>
+            <p class="text-slate-300 text-sm mb-6">กรุณากรอกรหัสผ่าน 6 หลักเพื่อดูข้อมูล</p>
+            
+            <!-- PIN Indicators -->
+            <div id="pin-dots" class="flex justify-center gap-3 mb-2">
+                <div class="pin-dot w-4 h-4 rounded-full border-2 border-slate-400"></div>
+                <div class="pin-dot w-4 h-4 rounded-full border-2 border-slate-400"></div>
+                <div class="pin-dot w-4 h-4 rounded-full border-2 border-slate-400"></div>
+                <div class="pin-dot w-4 h-4 rounded-full border-2 border-slate-400"></div>
+                <div class="pin-dot w-4 h-4 rounded-full border-2 border-slate-400"></div>
+                <div class="pin-dot w-4 h-4 rounded-full border-2 border-slate-400"></div>
+            </div>
+            <p id="pin-error" class="text-rose-400 text-xs h-5 mb-4 font-medium"></p>
+
+            <!-- Numpad -->
+            <div class="grid grid-cols-3 gap-3 max-w-[260px] mx-auto">
+                <button onclick="pressPin('1')" class="numpad-btn h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-indigo-600 text-xl font-semibold transition flex items-center justify-center">1</button>
+                <button onclick="pressPin('2')" class="numpad-btn h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-indigo-600 text-xl font-semibold transition flex items-center justify-center">2</button>
+                <button onclick="pressPin('3')" class="numpad-btn h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-indigo-600 text-xl font-semibold transition flex items-center justify-center">3</button>
+                <button onclick="pressPin('4')" class="numpad-btn h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-indigo-600 text-xl font-semibold transition flex items-center justify-center">4</button>
+                <button onclick="pressPin('5')" class="numpad-btn h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-indigo-600 text-xl font-semibold transition flex items-center justify-center">5</button>
+                <button onclick="pressPin('6')" class="numpad-btn h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-indigo-600 text-xl font-semibold transition flex items-center justify-center">6</button>
+                <button onclick="pressPin('7')" class="numpad-btn h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-indigo-600 text-xl font-semibold transition flex items-center justify-center">7</button>
+                <button onclick="pressPin('8')" class="numpad-btn h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-indigo-600 text-xl font-semibold transition flex items-center justify-center">8</button>
+                <button onclick="pressPin('9')" class="numpad-btn h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-indigo-600 text-xl font-semibold transition flex items-center justify-center">9</button>
+                <button onclick="clearPin()" class="h-14 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-sm font-medium transition flex items-center justify-center">ล้าง</button>
+                <button onclick="pressPin('0')" class="numpad-btn h-14 rounded-2xl bg-white/10 hover:bg-white/20 active:bg-indigo-600 text-xl font-semibold transition flex items-center justify-center">0</button>
+                <button onclick="deletePin()" class="h-14 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-300 text-lg transition flex items-center justify-center"><i class="fa-solid fa-delete-left"></i></button>
+            </div>
+            <p class="text-slate-400 text-xs mt-6">รหัสผ่านเข้าสู่ระบบ: <span class="text-indigo-300 font-mono">456789</span></p>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. MAIN DASHBOARD APPLICATION              -->
+    <!-- ========================================== -->
+    <div id="main-app" class="hidden min-h-screen flex flex-col">
+        
+        <!-- Top Navigation Bar -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-indigo-200">
+                        <i class="fa-solid fa-wallet text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg text-slate-800 leading-tight">Smart Ledger</h1>
+                        <p class="text-xs text-slate-500">ระบบบันทึกรายรับ-รายจ่าย</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <!-- Pull from Google Sheet Button -->
+                    <button onclick="loadFromGoogleSheet(true)" id="btn-pull-sheet" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs sm:text-sm font-medium transition" title="ดึงข้อมูลล่าสุดจาก Google Sheet">
+                        <i id="pull-icon" class="fa-solid fa-rotate text-indigo-600"></i>
+                        <span class="hidden sm:inline">ดึงข้อมูลจาก Sheet</span>
+                    </button>
+
+                    <!-- Google Sheet Setup Button -->
+                    <button onclick="openSheetModal()" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs sm:text-sm font-medium transition">
+                        <i class="fa-solid fa-table text-emerald-600"></i>
+                        <span class="hidden sm:inline">ตั้งค่า Google Sheet</span>
+                        <span id="sheet-status-dot" class="w-2 h-2 rounded-full bg-emerald-500" title="เชื่อมต่อ URL แล้ว"></span>
+                    </button>
+
+                    <!-- Lock App Button -->
+                    <button onclick="lockApp()" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition" title="ล็อกหน้าจอ">
+                        <i class="fa-solid fa-lock"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Container -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+            <!-- Summary Cards Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+                <!-- Net Balance Card -->
+                <div class="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-6 text-white shadow-lg shadow-indigo-200 relative overflow-hidden">
+                    <div class="absolute right-0 top-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-indigo-100 text-sm font-medium">ยอดเงินคงเหลือสุทธิ</span>
+                        <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                            <i class="fa-solid fa-scale-balanced"></i>
+                        </div>
+                    </div>
+                    <div id="total-balance" class="text-3xl sm:text-4xl font-bold tracking-tight">฿0.00</div>
+                    <p class="text-indigo-200 text-xs mt-2 flex items-center gap-1" id="last-sync-text">
+                        <i class="fa-solid fa-circle-info"></i> กำลังซิงค์ข้อมูลกับ Google Sheet...
+                    </p>
+                </div>
+
+                <!-- Total Income Card -->
+                <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-slate-500 text-sm font-medium">รายรับทั้งหมด</span>
+                        <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                            <i class="fa-solid fa-arrow-trend-up"></i>
+                        </div>
+                    </div>
+                    <div id="total-income" class="text-2xl sm:text-3xl font-bold text-emerald-600">฿0.00</div>
+                    <div class="text-xs text-slate-400 mt-2" id="income-count">0 รายการ</div>
+                </div>
+
+                <!-- Total Expense Card -->
+                <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-slate-500 text-sm font-medium">รายจ่ายทั้งหมด</span>
+                        <div class="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                            <i class="fa-solid fa-arrow-trend-down"></i>
+                        </div>
+                    </div>
+                    <div id="total-expense" class="text-2xl sm:text-3xl font-bold text-rose-600">฿0.00</div>
+                    <div class="text-xs text-slate-400 mt-2" id="expense-count">0 รายการ</div>
+                </div>
+            </div>
+
+            <!-- Middle Section: Add Transaction Form & Analytics Chart -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- Left Column: Add New Record Form (5 cols) -->
+                <div class="lg:col-span-5 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-pen-to-square text-indigo-600"></i> บันทึกรายการใหม่
+                    </h2>
+
+                    <form id="transaction-form" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-2xl">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="type" value="income" class="peer sr-only" onchange="updateCategories()">
+                                <div class="py-2.5 text-center rounded-xl text-sm font-semibold text-slate-600 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:shadow-sm transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-plus-circle"></i> รายรับ
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="type" value="expense" class="peer sr-only" checked onchange="updateCategories()">
+                                <div class="py-2.5 text-center rounded-xl text-sm font-semibold text-slate-600 peer-checked:bg-rose-500 peer-checked:text-white peer-checked:shadow-sm transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-minus-circle"></i> รายจ่าย
+                                </div>
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">จำนวนเงิน (บาท) <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">฿</span>
+                                <input type="number" id="amount" step="0.01" min="0.01" required placeholder="0.00" 
+                                    class="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">หมวดหมู่</label>
+                                <select id="category" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"></select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">วันที่</label>
+                                <input type="date" id="date" required 
+                                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                            </div>
+                        </div>
+
+                        <div id="project-field-container" class="hidden transition-all">
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-medium text-slate-600">โครงการ (สำหรับรายรับ)</label>
+                                <button type="button" onclick="toggleNewProjectInput()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
+                                    <i class="fa-solid fa-plus"></i> เพิ่มชื่อโครงการใหม่
+                                </button>
+                            </div>
+                            <select id="project" class="w-full px-3.5 py-2.5 bg-emerald-50/60 border border-emerald-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"></select>
+                            <div id="new-project-box" class="hidden mt-2 flex gap-2">
+                                <input type="text" id="new-project-name" placeholder="พิมพ์ชื่อโครงการใหม่..." 
+                                    class="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <button type="button" onclick="addNewProject()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-xl transition">เพิ่ม</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">รายละเอียด (ที่มาของเงิน / จ่ายค่าอะไร) <span class="text-rose-500">*</span></label>
+                            <input type="text" id="description" required placeholder="เช่น เงินเดือน, ค่าอาหารกลางวัน, ค่าน้ำมัน..." 
+                                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                        </div>
+
+                        <button type="submit" id="submit-btn" class="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-semibold rounded-2xl shadow-md shadow-indigo-200 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                            <span>บันทึกข้อมูล & ซิงค์ลง Sheet</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Right Column: Dashboard Chart & Breakdown (7 cols) -->
+                <div class="lg:col-span-7 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm flex flex-col">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-indigo-600"></i> ภาพรวมสัดส่วนการเงิน
+                        </h2>
+                        <div class="flex gap-2">
+                            <button onclick="switchChart('summary')" id="btn-chart-summary" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 transition">รายรับ vs รายจ่าย</button>
+                            <button onclick="switchChart('expense')" id="btn-chart-expense" class="px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-50 text-slate-600 hover:bg-slate-100 transition">สัดส่วนรายจ่าย</button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 flex flex-col sm:flex-row items-center justify-center gap-6 min-h-[240px]">
+                        <div class="w-full max-w-[240px] aspect-square relative">
+                            <canvas id="financeChart"></canvas>
+                        </div>
+                        <div id="chart-legend-custom" class="w-full sm:w-auto flex-1 space-y-2.5 max-h-[260px] overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Section: Transaction History Table -->
+            <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-list-ul text-indigo-600"></i> ประวัติรายการทั้งหมดจาก Google Sheet
+                        </h2>
+                        <p class="text-xs text-slate-500">หากแก้ไขข้อมูลใน Google Sheet โดยตรง ให้กดปุ่ม <strong>"ดึงข้อมูลจาก Sheet"</strong> เพื่ออัปเดตตารางนี้</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="loadFromGoogleSheet(true)" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-rotate"></i> รีเฟรชจาก Sheet
+                        </button>
+                        <select id="filter-type" onchange="renderTransactions()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none">
+                            <option value="all">ทั้งหมด</option>
+                            <option value="income">เฉพาะรายรับ</option>
+                            <option value="expense">เฉพาะรายจ่าย</option>
+                        </select>
+                        <button onclick="exportToCSV()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-csv"></i> โหลด CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-3 whitespace-nowrap w-28">วันที่</th>
+                                <th class="py-3 px-3 whitespace-nowrap w-24">ประเภท</th>
+                                <th class="py-3 px-3 whitespace-nowrap">หมวดหมู่</th>
+                                <th class="py-3 px-3 whitespace-nowrap">โครงการ</th>
+                                <th class="py-3 px-4 min-w-[260px] sm:min-w-[340px]">รายละเอียด</th>
+                                <th class="py-3 px-3 text-right whitespace-nowrap">จำนวนเงิน</th>
+                                <th class="py-3 px-3 text-center whitespace-nowrap">สถานะ Sheet</th>
+                                <th class="py-3 px-3 text-center whitespace-nowrap">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transaction-list" class="divide-y divide-slate-100 text-sm"></tbody>
+                    </table>
+                </div>
+
+                <div id="empty-state" class="hidden py-12 text-center">
+                    <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <i class="fa-solid fa-receipt text-2xl"></i>
+                    </div>
+                    <p class="text-slate-600 font-medium">ยังไม่มีรายการบันทึก</p>
+                    <p class="text-slate-400 text-xs mt-1">กดปุ่ม "ดึงข้อมูลจาก Sheet" หรือเพิ่มรายการใหม่</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 3. GOOGLE SHEET SETUP MODAL (PIN: 778899)  -->
+    <!-- ========================================== -->
+    <div id="sheet-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl border border-slate-200">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                        <i class="fa-solid fa-file-excel text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">เชื่อมต่อ Google Sheet อัตโนมัติ</h3>
+                        <p class="text-xs text-slate-500">ซิงค์ข้อมูล 2 ทางระหว่างหน้าเว็บและ Google Sheets</p>
+                    </div>
+                </div>
+                <button onclick="closeSheetModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- PIN Gate for Settings -->
+            <div id="sheet-pin-gate" class="py-8 text-center space-y-4">
+                <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto">
+                    <i class="fa-solid fa-key text-xl"></i>
+                </div>
+                <div>
+                    <h4 class="text-base font-bold text-slate-800">ยืนยันรหัสผ่านตั้งค่า Google Sheet</h4>
+                    <p class="text-xs text-slate-500 mt-1">กรุณากรอกรหัสผ่าน 6 หลัก (778899) เพื่อเข้าถึงการตั้งค่า</p>
+                </div>
+                <div class="max-w-[220px] mx-auto space-y-3">
+                    <input type="password" id="sheet-pin-input" maxlength="6" inputmode="numeric" placeholder="••••••"
+                        oninput="checkSheetPinInput()"
+                        class="w-full text-center tracking-[0.5em] text-2xl font-bold py-3 px-4 bg-slate-50 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <p id="sheet-pin-error" class="text-xs text-rose-500 font-medium h-4"></p>
+                    <button type="button" onclick="verifySheetPin()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
+                        ปลดล็อกการตั้งค่า
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings Content -->
+            <div id="sheet-settings-content" class="hidden py-5 space-y-5">
+                <div class="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4">
+                    <label class="block text-sm font-semibold text-emerald-900 mb-1.5">ลิงก์ Google Apps Script Web App URL:</label>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="url" id="webhook-url" placeholder="https://script.google.com/macros/s/.../exec" 
+                            class="flex-1 px-4 py-2.5 bg-white border border-emerald-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <button onclick="saveWebhookUrl()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
+                            บันทึกการเชื่อมต่อ
+                        </button>
+                    </div>
+                    <p id="webhook-msg" class="text-xs text-emerald-700 mt-2"></p>
+                </div>
+
+                <div class="space-y-3">
+                    <h4 class="text-sm font-bold text-slate-800">โค้ด Apps Script เวอร์ชันซิงค์ 2 ทาง (คัดลอกไปวางในชีตของคุณ):</h4>
+                    <div class="relative">
+                        <button onclick="copyAppsScript()" class="absolute right-3 top-3 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs rounded-lg flex items-center gap-1.5 transition">
+                            <i class="fa-regular fa-copy"></i> คัดลอกโค้ด
+                        </button>
+                        <pre id="apps-script-code" class="bg-slate-900 text-slate-100 p-4 rounded-2xl text-xs font-mono overflow-x-auto leading-relaxed">function doGet(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var lastRow = sheet.getLastRow();
+  var result = [];
+
+  if (lastRow > 1) {
+    var data = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      if (!row[0] && !row[4]) continue;
+
+      var dateStr = row[0];
+      if (row[0] instanceof Date) {
+        dateStr = Utilities.formatDate(row[0], Session.getScriptTimeZone(), "yyyy-MM-dd");
+      } else {
+        dateStr = String(row[0]).trim();
+      }
+
+      result.push({
+        id: row[7] ? String(row[7]) : String(i + 2),
+        date: dateStr,
+        type: String(row[1]).trim() === 'รายรับ' ? 'income' : 'expense',
+        category: String(row[2] || ''),
+        project: String(row[3] || '-'),
+        description: String(row[4] || ''),
+        amount: parseFloat(row[5]) || 0,
+        synced: true
+      });
+    }
+  }
+  result.reverse();
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['วันที่', 'ประเภท', 'หมวดหมู่', 'โครงการ', 'รายละเอียด', 'จำนวนเงิน', 'เวลาที่บันทึก', 'ID']);
+    sheet.getRange(1, 1, 1, 8).setFontWeight('bold').setBackground('#E2E8F0');
+  }
+  
+  var rowValues = [
+    data.date,
+    data.type === 'income' ? 'รายรับ' : 'รายจ่าย',
+    data.category,
+    data.project || '-',
+    data.description,
+    data.amount,
+    new Date().toLocaleString('th-TH'),
+    String(data.id)
+  ];
+
+  if (data.action === 'update' && data.id) {
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      var idRange = sheet.getRange(2, 8, lastRow - 1, 1).getValues();
+      for (var i = 0; i < idRange.length; i++) {
+        if (String(idRange[i][0]) === String(data.id)) {
+          sheet.getRange(i + 2, 1, 1, 8).setValues([rowValues]);
+          return ContentService.createTextOutput(JSON.stringify({status: 'updated'}))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+    }
+  }
+  
+  sheet.appendRow(rowValues);
+  return ContentService.createTextOutput(JSON.stringify({status: 'success'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 4. EDIT TRANSACTION MODAL                  -->
+    <!-- ========================================== -->
+    <div id="edit-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                        <i class="fa-solid fa-pen-to-square text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">แก้ไขรายการบันทึก</h3>
+                        <p class="text-xs text-slate-500">ข้อมูลที่แก้ไขจะอัปเดตทับรายการเดิมใน Google Sheet อัตโนมัติ</p>
+                    </div>
+                </div>
+                <button onclick="closeEditModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="edit-transaction-form" onsubmit="handleEditSubmit(event)" class="space-y-4">
+                <input type="hidden" id="edit-id">
+
+                <div class="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-2xl">
+                    <label class="cursor-pointer">
+                        <input type="radio" name="edit-type" value="income" class="peer sr-only" onchange="updateEditCategories()">
+                        <div class="py-2 text-center rounded-xl text-sm font-semibold text-slate-600 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:shadow-sm transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus-circle"></i> รายรับ
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="radio" name="edit-type" value="expense" class="peer sr-only" onchange="updateEditCategories()">
+                        <div class="py-2 text-center rounded-xl text-sm font-semibold text-slate-600 peer-checked:bg-rose-500 peer-checked:text-white peer-checked:shadow-sm transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-minus-circle"></i> รายจ่าย
+                        </div>
+                    </label>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">จำนวนเงิน (บาท) <span class="text-rose-500">*</span></label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">฿</span>
+                        <input type="number" id="edit-amount" step="0.01" min="0.01" required
+                            class="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">หมวดหมู่</label>
+                        <select id="edit-category" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">วันที่</label>
+                        <input type="date" id="edit-date" required
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                    </div>
+                </div>
+
+                <div id="edit-project-container" class="hidden">
+                    <label class="block text-xs font-medium text-slate-600 mb-1">โครงการ (สำหรับรายรับ)</label>
+                    <select id="edit-project" class="w-full px-3.5 py-2.5 bg-emerald-50/60 border border-emerald-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"></select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">รายละเอียด <span class="text-rose-500">*</span></label>
+                    <input type="text" id="edit-description" required
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeEditModal()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-2xl transition">ยกเลิก</button>
+                    <button type="submit" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-2xl shadow-md shadow-amber-200 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check"></i> บันทึกการแก้ไข
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+    <!-- ========================================== -->
+    <!-- 5. JAVASCRIPT LOGIC                        -->
+    <!-- ========================================== -->
+    <script>
+        const CORRECT_PIN = "456789";
+        const SHEET_SETUP_PIN = "778899";
+        let currentPinInput = "";
+        let webhookUrl = "https://script.google.com/macros/s/AKfycbySX8V7GzR_L7Ek0knvVluQcYim_8sgYbtm0iZfMYIo_qlNxLTIthM-r5gF99BVUhEN/exec";
+        let currentChartMode = "summary";
+        let financeChartInstance = null;
+
+        const CATEGORIES = {
+            income: ["เงินเดือน", "โครงการ", "เงินสนับสนุนจากบริษัทเอกชน", "โบนัส / ค่าคอม", "ขายของ / ธุรกิจ", "ดอกเบี้ย / เงินปันผล", "รายรับอื่นๆ"],
+            expense: ["อาหารและเครื่องดื่ม", "โครงการ", "เดินทาง / น้ำมัน", "ช้อปปิ้ง / ของใช้", "บิล / ค่าน้ำค่าไฟ", "ที่พัก / ค่าเช่า", "สุขภาพ / รักษาพยาบาล", "รายจ่ายอื่นๆ"]
+        };
+
+        let PROJECTS = [
+            "ไม่ระบุโครงการ (ทั่วไป)",
+            "โครงการ A - งานรับเหมา/บริการ",
+            "โครงการ B - พัฒนาระบบ",
+            "โครงการ C - การตลาดออนไลน์",
+            "โครงการพิเศษ"
+        ];
+
+        let transactions = [];
+
+        window.onload = function() {
+            document.getElementById('date').value = new Date().toISOString().split('T')[0];
+            populateProjects();
+            updateCategories();
+            
+            document.addEventListener('keydown', (e) => {
+                if (!document.getElementById('lock-screen').classList.contains('hidden')) {
+                    if (e.key >= '0' && e.key <= '9') pressPin(e.key);
+                    if (e.key === 'Backspace') deletePin();
+                    if (e.key === 'Escape') clearPin();
+                }
+            });
+        };
+
+        // --- PIN LOCK ---
+        function pressPin(digit) {
+            if (currentPinInput.length < 6) {
+                currentPinInput += digit;
+                updatePinDots();
+                document.getElementById('pin-error').textContent = "";
+                if (currentPinInput.length === 6) setTimeout(verifyPin, 150);
+            }
+        }
+
+        function deletePin() {
+            currentPinInput = currentPinInput.slice(0, -1);
+            updatePinDots();
+        }
+
+        function clearPin() {
+            currentPinInput = "";
+            updatePinDots();
+            document.getElementById('pin-error').textContent = "";
+        }
+
+        function updatePinDots() {
+            document.querySelectorAll('.pin-dot').forEach((dot, idx) => {
+                dot.classList.toggle('active', idx < currentPinInput.length);
+            });
+        }
+
+        function verifyPin() {
+            if (currentPinInput === CORRECT_PIN) {
+                document.getElementById('lock-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                currentPinInput = "";
+                updatePinDots();
+                refreshDashboard();
+                loadFromGoogleSheet(false); // ดึงข้อมูลจาก Sheet อัตโนมัติทันทีที่เข้าสู่ระบบ
+            } else {
+                const dotsContainer = document.getElementById('pin-dots');
+                dotsContainer.classList.add('shake');
+                document.getElementById('pin-error').textContent = "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่ (456789)";
+                setTimeout(() => {
+                    dotsContainer.classList.remove('shake');
+                    clearPin();
+                }, 500);
+            }
+        }
+
+        function lockApp() {
+            clearPin();
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('lock-screen').classList.remove('hidden');
+        }
+
+        // --- PULL DATA FROM GOOGLE SHEET ---
+        async function loadFromGoogleSheet(showNotify = true) {
+            if (!webhookUrl) {
+                if (showNotify) showToast("ยังไม่ได้ตั้งค่าลิงก์ Google Sheet", "error");
+                return;
+            }
+
+            const pullIcon = document.getElementById('pull-icon');
+            const syncText = document.getElementById('last-sync-text');
+            if (pullIcon) pullIcon.classList.add('fa-spin');
+            if (syncText) syncText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> กำลังดึงข้อมูลจาก Google Sheet...`;
+
+            try {
+                const response = await fetch(webhookUrl, { method: 'GET' });
+                if (!response.ok) throw new Error("Network error");
+                const data = await response.json();
+
+                if (Array.isArray(data)) {
+                    transactions = data.map(item => ({
+                        ...item,
+                        id: String(item.id),
+                        date: normalizeDate(item.date)
+                    }));
+
+                    transactions.forEach(t => {
+                        if (t.project && t.project !== '-' && !PROJECTS.includes(t.project)) {
+                            PROJECTS.push(t.project);
+                        }
+                    });
+                    populateProjects();
+                    refreshDashboard();
+
+                    const nowTime = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                    if (syncText) syncText.innerHTML = `<i class="fa-solid fa-circle-check"></i> ซิงค์ล่าสุดเมื่อ ${nowTime} น. (${transactions.length} รายการ)`;
+                    if (showNotify) showToast(`อัปเดตข้อมูลจาก Google Sheet สำเร็จ (${transactions.length} รายการ)`, "success");
+                }
+            } catch (err) {
+                console.error("Load error:", err);
+                if (syncText) syncText.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ยังไม่ได้อัปเดตฟังก์ชัน doGet ใน Apps Script`;
+                if (showNotify) showToast("ดึงข้อมูลไม่สำเร็จ กรุณาอัปเดตโค้ด doGet ใน Apps Script และ Deploy New Version", "error");
+            } finally {
+                if (pullIcon) pullIcon.classList.remove('fa-spin');
+            }
+        }
+
+        // --- PROJECTS & CATEGORIES ---
+        function populateProjects(selectedValue = null) {
+            const projectSelect = document.getElementById('project');
+            projectSelect.innerHTML = "";
+            PROJECTS.forEach(proj => {
+                const option = document.createElement('option');
+                option.value = proj;
+                option.textContent = proj;
+                if (selectedValue && proj === selectedValue) option.selected = true;
+                projectSelect.appendChild(option);
+            });
+        }
+
+        function toggleNewProjectInput() {
+            const box = document.getElementById('new-project-box');
+            box.classList.toggle('hidden');
+            if (!box.classList.contains('hidden')) document.getElementById('new-project-name').focus();
+        }
+
+        function addNewProject() {
+            const input = document.getElementById('new-project-name');
+            const name = input.value.trim();
+            if (!name) return showToast("กรุณาพิมพ์ชื่อโครงการก่อนกดเพิ่ม", "error");
+            if (!PROJECTS.includes(name)) PROJECTS.push(name);
+            populateProjects(name);
+            input.value = "";
+            document.getElementById('new-project-box').classList.add('hidden');
+            showToast(`เพิ่มโครงการ "${name}" แล้ว`, "success");
+        }
+
+        function updateCategories() {
+            const selectedType = document.querySelector('input[name="type"]:checked').value;
+            const categorySelect = document.getElementById('category');
+            const projectContainer = document.getElementById('project-field-container');
+            
+            categorySelect.innerHTML = "";
+            CATEGORIES[selectedType].forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                categorySelect.appendChild(option);
+            });
+
+            projectContainer.classList.toggle('hidden', selectedType !== 'income');
+        }
+
+        // --- CREATE & EDIT TRANSACTIONS ---
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const type = document.querySelector('input[name="type"]:checked').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const category = document.getElementById('category').value;
+            const project = type === 'income' ? document.getElementById('project').value : '-';
+            const date = document.getElementById('date').value;
+            const description = document.getElementById('description').value.trim();
+
+            if (isNaN(amount) || amount <= 0 || !description) {
+                return showToast("กรุณากรอกข้อมูลให้ครบถ้วน", "error");
+            }
+
+            const newTx = {
+                id: String(Date.now()),
+                date,
+                type,
+                category,
+                project,
+                description,
+                amount,
+                synced: false
+            };
+
+            transactions.unshift(newTx);
+            document.getElementById('amount').value = "";
+            document.getElementById('description').value = "";
+
+            refreshDashboard();
+            showToast(`บันทึก${type === 'income' ? 'รายรับ' : 'รายจ่าย'}เรียบร้อยแล้ว`, "success");
+
+            if (webhookUrl) {
+                await syncToGoogleSheet(newTx, 'create');
+            }
+        }
+
+        function openEditModal(id) {
+            const tx = transactions.find(t => String(t.id) === String(id));
+            if (!tx) return;
+
+            document.getElementById('edit-id').value = tx.id;
+            document.getElementById('edit-amount').value = tx.amount;
+            document.getElementById('edit-date').value = normalizeDate(tx.date);
+            document.getElementById('edit-description').value = tx.description;
+
+            document.querySelectorAll('input[name="edit-type"]').forEach(r => {
+                r.checked = (r.value === tx.type);
+            });
+
+            updateEditCategories(tx.category);
+
+            const editProjSelect = document.getElementById('edit-project');
+            editProjSelect.innerHTML = "";
+            PROJECTS.forEach(proj => {
+                const opt = document.createElement('option');
+                opt.value = proj;
+                opt.textContent = proj;
+                if (tx.project === proj) opt.selected = true;
+                editProjSelect.appendChild(opt);
+            });
+
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.add('hidden');
+        }
+
+        function updateEditCategories(selectedCat = null) {
+            const selectedType = document.querySelector('input[name="edit-type"]:checked').value;
+            const catSelect = document.getElementById('edit-category');
+            const projContainer = document.getElementById('edit-project-container');
+
+            catSelect.innerHTML = "";
+            const list = [...CATEGORIES[selectedType]];
+            if (selectedCat && !list.includes(selectedCat)) list.unshift(selectedCat);
+
+            list.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                if (selectedCat && cat === selectedCat) opt.selected = true;
+                catSelect.appendChild(opt);
+            });
+
+            projContainer.classList.toggle('hidden', selectedType !== 'income');
+        }
+
+        async function handleEditSubmit(e) {
+            e.preventDefault();
+
+            const id = String(document.getElementById('edit-id').value);
+            const type = document.querySelector('input[name="edit-type"]:checked').value;
+            const amount = parseFloat(document.getElementById('edit-amount').value);
+            const category = document.getElementById('edit-category').value;
+            const project = type === 'income' ? document.getElementById('edit-project').value : '-';
+            const date = document.getElementById('edit-date').value;
+            const description = document.getElementById('edit-description').value.trim();
+
+            if (isNaN(amount) || amount <= 0 || !description) {
+                return showToast("กรุณากรอกข้อมูลให้ครบถ้วน", "error");
+            }
+
+            const idx = transactions.findIndex(t => String(t.id) === id);
+            if (idx === -1) return;
+
+            transactions[idx] = {
+                ...transactions[idx],
+                type,
+                amount,
+                category,
+                project,
+                date,
+                description,
+                synced: false
+            };
+
+            closeEditModal();
+            refreshDashboard();
+            showToast("แก้ไขข้อมูลในตารางเรียบร้อยแล้ว", "success");
+
+            if (webhookUrl) {
+                await syncToGoogleSheet(transactions[idx], 'update');
+            }
+        }
+
+        function deleteTransaction(id) {
+            transactions = transactions.filter(t => String(t.id) !== String(id));
+            refreshDashboard();
+            showToast("ลบรายการออกจากหน้าจอแล้ว", "info");
+        }
+
+        async function syncToGoogleSheet(tx, action = 'create') {
+            if (!webhookUrl) return;
+            try {
+                await fetch(webhookUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...tx, action })
+                });
+                const target = transactions.find(t => String(t.id) === String(tx.id));
+                if (target) target.synced = true;
+                renderTransactions();
+                showToast(action === 'update' ? "อัปเดตแก้ไขข้อมูลใน Google Sheet สำเร็จ!" : "ส่งข้อมูลเข้า Google Sheet สำเร็จ!", "success");
+            } catch (error) {
+                console.error("Sync error:", error);
+                showToast("ไม่สามารถส่งเข้า Google Sheet ได้ โปรดตรวจสอบ URL", "error");
+            }
+        }
+
+        // --- SHEET MODAL ---
+        function openSheetModal() {
+            document.getElementById('webhook-url').value = webhookUrl;
+            document.getElementById('sheet-pin-input').value = "";
+            document.getElementById('sheet-pin-error').textContent = "";
+            document.getElementById('sheet-pin-gate').classList.remove('hidden');
+            document.getElementById('sheet-settings-content').classList.add('hidden');
+            document.getElementById('sheet-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('sheet-pin-input').focus(), 100);
+        }
+
+        function checkSheetPinInput() {
+            if (document.getElementById('sheet-pin-input').value.length === 6) verifySheetPin();
+        }
+
+        function verifySheetPin() {
+            const input = document.getElementById('sheet-pin-input');
+            const err = document.getElementById('sheet-pin-error');
+            if (input.value === SHEET_SETUP_PIN) {
+                document.getElementById('sheet-pin-gate').classList.add('hidden');
+                document.getElementById('sheet-settings-content').classList.remove('hidden');
+                err.textContent = "";
+            } else {
+                err.textContent = "รหัสผ่านไม่ถูกต้อง กรุณากรอก 778899";
+                input.value = "";
+                input.focus();
+            }
+        }
+
+        function closeSheetModal() {
+            document.getElementById('sheet-modal').classList.add('hidden');
+        }
+
+        function saveWebhookUrl() {
+            const urlInput = document.getElementById('webhook-url').value.trim();
+            const dot = document.getElementById('sheet-status-dot');
+            const msg = document.getElementById('webhook-msg');
+
+            if (!urlInput.startsWith("https://script.google.com/")) {
+                msg.textContent = "⚠️ รูปแบบ URL ไม่ถูกต้อง ต้องขึ้นต้นด้วย https://script.google.com/...";
+                msg.classList.replace('text-emerald-700', 'text-rose-600');
+                return;
+            }
+
+            webhookUrl = urlInput;
+            dot.classList.replace('bg-amber-400', 'bg-emerald-500');
+            msg.textContent = "✅ บันทึกลิงก์สำเร็จ! กำลังดึงข้อมูลล่าสุดจาก Sheet...";
+            msg.classList.replace('text-rose-600', 'text-emerald-700');
+            setTimeout(() => {
+                closeSheetModal();
+                loadFromGoogleSheet(true);
+            }, 800);
+        }
+
+        function copyAppsScript() {
+            const codeText = document.getElementById('apps-script-code').innerText;
+            const textarea = document.createElement('textarea');
+            textarea.value = codeText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast("คัดลอกโค้ด Apps Script เรียบร้อย!", "success");
+        }
+
+        // --- DASHBOARD RENDERING ---
+        function refreshDashboard() {
+            updateSummaryCards();
+            renderTransactions();
+            renderChart();
+        }
+
+        function formatCurrency(num) {
+            return '฿' + num.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function updateSummaryCards() {
+            let totalIncome = 0, totalExpense = 0, incomeCount = 0, expenseCount = 0;
+            transactions.forEach(t => {
+                if (t.type === 'income') { totalIncome += t.amount; incomeCount++; }
+                else { totalExpense += t.amount; expenseCount++; }
+            });
+            document.getElementById('total-balance').textContent = formatCurrency(totalIncome - totalExpense);
+            document.getElementById('total-income').textContent = formatCurrency(totalIncome);
+            document.getElementById('total-expense').textContent = formatCurrency(totalExpense);
+            document.getElementById('income-count').textContent = `${incomeCount} รายการ`;
+            document.getElementById('expense-count').textContent = `${expenseCount} รายการ`;
+        }
+
+        function renderTransactions() {
+            const tbody = document.getElementById('transaction-list');
+            const emptyState = document.getElementById('empty-state');
+            const filter = document.getElementById('filter-type').value;
+            const filtered = transactions.filter(t => filter === 'all' || t.type === filter);
+
+            tbody.innerHTML = "";
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            filtered.forEach(t => {
+                const isIncome = t.type === 'income';
+                const row = document.createElement('tr');
+                row.className = "hover:bg-slate-50/80 transition";
+                row.innerHTML = `
+                    <td class="py-3.5 px-3 whitespace-nowrap text-slate-600 text-xs font-medium">${formatThaiDate(t.date)}</td>
+                    <td class="py-3.5 px-3 whitespace-nowrap">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold ${isIncome ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                            <i class="fa-solid ${isIncome ? 'fa-arrow-up' : 'fa-arrow-down'} text-[10px]"></i>
+                            ${isIncome ? 'รายรับ' : 'รายจ่าย'}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-3 whitespace-nowrap text-slate-700 font-medium text-xs">${escapeHtml(t.category)}</td>
+                    <td class="py-3.5 px-3 whitespace-nowrap text-xs">
+                        ${isIncome && t.project && t.project !== '-' 
+                            ? `<span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 font-medium">${escapeHtml(t.project)}</span>` 
+                            : '<span class="text-slate-400">-</span>'}
+                    </td>
+                    <td class="py-3.5 px-4 text-slate-800 leading-relaxed min-w-[260px] sm:min-w-[340px]">${escapeHtml(t.description)}</td>
+                    <td class="py-3.5 px-3 whitespace-nowrap text-right font-bold ${isIncome ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${isIncome ? '+' : '-'}${formatCurrency(t.amount)}
+                    </td>
+                    <td class="py-3.5 px-3 whitespace-nowrap text-center text-xs">
+                        ${t.synced 
+                            ? '<span class="text-emerald-600 font-medium inline-flex items-center gap-1"><i class="fa-solid fa-check-circle"></i> ซิงค์แล้ว</span>' 
+                            : `<button onclick="manualSync('${t.id}')" class="text-amber-600 hover:underline font-medium">ยังไม่ซิงค์</button>`}
+                    </td>
+                    <td class="py-3.5 px-3 whitespace-nowrap text-center">
+                        <div class="inline-flex items-center gap-1">
+                            <button onclick="openEditModal('${t.id}')" class="text-slate-400 hover:text-amber-600 p-1.5 rounded-lg hover:bg-amber-50 transition" title="แก้ไขรายการ">
+                                <i class="fa-regular fa-pen-to-square"></i>
+                            </button>
+                            <button onclick="deleteTransaction('${t.id}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition" title="ลบจากหน้าจอ">
+                                <i class="fa-regular fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function manualSync(id) {
+            const tx = transactions.find(t => String(t.id) === String(id));
+            if (tx) await syncToGoogleSheet(tx, 'update');
+        }
+
+        function switchChart(mode) {
+            currentChartMode = mode;
+            const btnSum = document.getElementById('btn-chart-summary');
+            const btnExp = document.getElementById('btn-chart-expense');
+            btnSum.className = mode === 'summary' 
+                ? "px-3 py-1.5 rounded-xl text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 transition"
+                : "px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-50 text-slate-600 hover:bg-slate-100 transition";
+            btnExp.className = mode === 'expense'
+                ? "px-3 py-1.5 rounded-xl text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 transition"
+                : "px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-50 text-slate-600 hover:bg-slate-100 transition";
+            renderChart();
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('financeChart').getContext('2d');
+            const legendContainer = document.getElementById('chart-legend-custom');
+            if (financeChartInstance) financeChartInstance.destroy();
+
+            let labels = [], data = [], colors = [];
+            if (currentChartMode === 'summary') {
+                const inc = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+                const exp = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+                labels = ['รายรับทั้งหมด', 'รายจ่ายทั้งหมด'];
+                data = [inc, exp];
+                colors = ['#10B981', '#EF4444'];
+            } else {
+                const expenseMap = {};
+                transactions.filter(t => t.type === 'expense').forEach(t => {
+                    expenseMap[t.category] = (expenseMap[t.category] || 0) + t.amount;
+                });
+                labels = Object.keys(expenseMap);
+                data = Object.values(expenseMap);
+                colors = ['#F43F5E', '#F97316', '#EAB308', '#8B5CF6', '#EC4899', '#06B6D4', '#64748B'];
+            }
+
+            const total = data.reduce((a, b) => a + b, 0);
+            legendContainer.innerHTML = "";
+            if (total === 0) {
+                legendContainer.innerHTML = `<p class="text-xs text-slate-400 text-center">ยังไม่มีข้อมูลสำหรับแสดงกราฟ</p>`;
+            } else {
+                labels.forEach((label, idx) => {
+                    const val = data[idx];
+                    const pct = ((val / total) * 100).toFixed(1);
+                    const color = colors[idx % colors.length];
+                    legendContainer.innerHTML += `
+                        <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                            <div class="flex justify-between text-xs font-medium mb-1">
+                                <span class="flex items-center gap-2 text-slate-700">
+                                    <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${color}"></span>
+                                    ${escapeHtml(label)}
+                                </span>
+                                <span class="font-bold text-slate-800">${formatCurrency(val)} (${pct}%)</span>
+                            </div>
+                            <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                <div class="h-full rounded-full" style="width: ${pct}%; background-color: ${color}"></div>
+                            </div>
+                        </div>`;
+                });
+            }
+
+            financeChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: total === 0 ? [1] : data,
+                        backgroundColor: total === 0 ? ['#E2E8F0'] : colors,
+                        borderWidth: 0,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    cutout: '72%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: total > 0,
+                            callbacks: { label: c => ` ${c.label}: ${formatCurrency(c.raw)}` }
+                        }
+                    }
+                }
+            });
+        }
+
+        // แปลงวันที่ทุกรูปแบบให้เป็น YYYY-MM-DD (สำหรับ input type="date")
+        function normalizeDate(dateStr) {
+            if (!dateStr) return "";
+            const str = String(dateStr).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+            if (/^\d{4}-\d{2}-\d{2}T/.test(str)) return str.split('T')[0];
+
+            const parsed = new Date(str);
+            if (!isNaN(parsed.getTime())) {
+                const y = parsed.getFullYear();
+                const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                const d = String(parsed.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+            return str;
+        }
+
+        // แสดงวันที่ภาษาไทยแบบสั้นอ่านง่าย เช่น 17 พ.ย. 2569
+        function formatThaiDate(dateStr) {
+            if (!dateStr) return "";
+            const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+            const cleanDate = normalizeDate(dateStr);
+
+            if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+                const [y, m, d] = cleanDate.split('-');
+                return `${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${parseInt(y, 10) + 543}`;
+            }
+            return String(dateStr);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function exportToCSV() {
+            if (transactions.length === 0) return showToast("ไม่มีข้อมูลสำหรับส่งออก", "error");
+            let csvContent = "\uFEFFวันที่,ประเภท,หมวดหมู่,โครงการ,รายละเอียด,จำนวนเงิน\n";
+            transactions.forEach(t => {
+                csvContent += `${normalizeDate(t.date)},${t.type === 'income' ? 'รายรับ' : 'รายจ่าย'},"${t.category}","${t.project || '-'}","${t.description}",${t.amount}\n`;
+            });
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `บัญชีรายรับรายจ่าย_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const styles = { success: "bg-emerald-600 text-white", error: "bg-rose-600 text-white", info: "bg-slate-800 text-white" };
+            const icons = { success: "fa-circle-check", error: "fa-circle-exclamation", info: "fa-circle-info" };
+            toast.className = `${styles[type]} px-4 py-3 rounded-2xl shadow-lg text-sm font-medium flex items-center gap-2.5 transform transition-all duration-300 translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type]}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.remove('translate-y-2', 'opacity-0'));
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
